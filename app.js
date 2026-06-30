@@ -1,18 +1,32 @@
-const WORKER_URL = 'https://abyss-proxy.storage2-7777.workers.dev/';
+// Point this to your new Cloudflare Worker URL
+const WORKER_URL = 'https://abyss-proxy.<YOUR_CLOUDFLARE_USERNAME>.workers.dev/';
+
+// --- ON-SCREEN VISUAL DEBUGGER ---
+const debugDiv = document.createElement('div');
+debugDiv.style.cssText = 'background:#222;color:#ff5555;padding:15px;margin:20px;border-radius:5px;border:1px solid #ff3333;font-family:monospace;white-space:pre-wrap;font-size:14px;';
+debugDiv.innerHTML = '<strong>System Status:</strong> Diagnostics started... Waiting for fetch.';
+document.body.insertBefore(debugDiv, document.body.firstChild);
+
+function logDebug(message, isSuccess = false) {
+    if (isSuccess) {
+        debugDiv.style.borderColor = '#00ff00';
+        debugDiv.style.color = '#00ff00';
+    }
+    debugDiv.innerHTML = `<strong>System Status:</strong> ${message}`;
+}
+// ---------------------------------
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(err => console.error(err));
+    navigator.serviceWorker.register('sw.js')
+        .then(() => console.log("Service Worker Registered"))
+        .catch(err => logDebug(`Service Worker Error: ${err.message}`));
 }
-
-// Track where we are so we can build a "Back" button later if needed
-let currentFolderId = "";
 
 async function fetchResources(folderId = "", pageToken = "") {
     const grid = document.getElementById('video-grid');
     
-    // Clear the grid if we are opening a new folder (not just loading a new page of the same folder)
     if (!pageToken) {
-        grid.innerHTML = '<p style="text-align:center; grid-column: 1 / -1;">Loading...</p>';
+        grid.innerHTML = '<p style="text-align:center; grid-column: 1 / -1;">Loading configuration...</p>';
     }
 
     try {
@@ -25,22 +39,34 @@ async function fetchResources(folderId = "", pageToken = "") {
             url += `?${params.toString()}`;
         }
 
+        logDebug(`Attempting to connect to proxy: ${url}`);
+
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        logDebug(`Received response from proxy. Status Code: ${response.status} (${response.statusText})`);
+
+        if (!response.ok) {
+            throw new Error(`Proxy returned an error code: ${response.status} ${response.statusText}`);
+        }
         
         const data = await response.json();
         
-        // Remove the loading text
+        // Check if the data has an explicit error from the worker
+        if (data.error) {
+            throw new Error(`Worker Backend Error: ${data.error}`);
+        }
+
+        logDebug(`Successfully parsed JSON! Found ${data.items ? data.items.length : 0} items.`, true);
+        
         if (!pageToken) grid.innerHTML = ''; 
 
-        // If at root and need a back button to reset
         if (folderId !== "") {
             renderBackButton();
         }
 
         if (data.items && data.items.length > 0) {
             renderItems(data.items, data.domainEmbed);
-        } else if (!pageToken && (!data.items || data.items.length === 0)) {
+        } else if (!pageToken) {
             grid.innerHTML = '<p style="text-align:center; grid-column: 1 / -1;">This folder is empty.</p>';
         }
 
@@ -48,8 +74,9 @@ async function fetchResources(folderId = "", pageToken = "") {
             setTimeout(() => fetchResources(folderId, data.pageToken), 1000); 
         }
     } catch (error) {
-        console.error("Error fetching resources:", error);
-        grid.innerHTML = '<p style="text-align:center; color: red;">Failed to load resources.</p>';
+        console.error(error);
+        logDebug(`CRITICAL ERROR: ${error.message}\n\nPossible fixes:\n1. Verify your Worker URL is 100% correct.\n2. Ensure you saved your Abyss API key as 'ABYSS_API_KEY' in Cloudflare environment variables.`);
+        grid.innerHTML = '<p style="text-align:center; color: red;">Failed to load resources. See debug window above.</p>';
     }
 }
 
@@ -64,7 +91,6 @@ function renderBackButton() {
             <div class="video-meta">Return to Root</div>
         </div>
     `;
-    // Fetch the root directory again
     backBtn.onclick = () => fetchResources(""); 
     grid.appendChild(backBtn);
 }
@@ -77,7 +103,6 @@ function renderItems(items, domainEmbed) {
         card.className = 'video-card';
         
         if (item.isDir) {
-            // RENDER A FOLDER
             card.classList.add('folder-card');
             card.innerHTML = `
                 <div style="padding: 40px; text-align: center; background: #333; font-size: 50px;">📁</div>
@@ -86,10 +111,8 @@ function renderItems(items, domainEmbed) {
                     <div class="video-meta">Folder</div>
                 </div>
             `;
-            // When clicked, fetch the contents of this specific folder
             card.onclick = () => fetchResources(item.id); 
         } else {
-            // RENDER A VIDEO FILE
             card.innerHTML = `
                 <div class="iframe-container">
                     <iframe src="https://${domainEmbed}/?v=${item.id}" allowfullscreen frameborder="0" scrolling="no"></iframe>
@@ -104,5 +127,4 @@ function renderItems(items, domainEmbed) {
     });
 }
 
-// Start by fetching the root directory
 fetchResources();
