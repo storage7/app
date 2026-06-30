@@ -1,6 +1,6 @@
 // Point this to your new Cloudflare Worker URL
 // Make sure to include the trailing slash if your worker URL has one, or format it exactly as Cloudflare provides.
-const WORKER_URL = 'https://abyss-proxy.storage2-7777.workers.dev/';
+const WORKER_URL = '[https://abyss-proxy.storage2-7777.workers.dev/](https://abyss-proxy.storage2-7777.workers.dev/)';
 
 // 1. Register Service Worker for PWA (Caching UI, bypassing network for API)
 if ('serviceWorker' in navigator) {
