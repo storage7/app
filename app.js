@@ -1,70 +1,108 @@
-// Point this to your new Cloudflare Worker URL
-// Make sure to include the trailing slash if your worker URL has one, or format it exactly as Cloudflare provides.
-const WORKER_URL = '[https://abyss-proxy.storage2-7777.workers.dev/](https://abyss-proxy.storage2-7777.workers.dev/)';
+const WORKER_URL = 'https://abyss-proxy.storage2-7777.workers.dev/';
 
-// 1. Register Service Worker for PWA (Caching UI, bypassing network for API)
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-        .then(() => console.log("Service Worker Registered Successfully"))
-        .catch(err => console.error("Service Worker Registration Failed:", err));
+    navigator.serviceWorker.register('sw.js').catch(err => console.error(err));
 }
 
-// 2. Fetch Videos via the Secure Proxy
-async function fetchVideos(pageToken = "") {
+// Track where we are so we can build a "Back" button later if needed
+let currentFolderId = "";
+
+async function fetchResources(folderId = "", pageToken = "") {
+    const grid = document.getElementById('video-grid');
+    
+    // Clear the grid if we are opening a new folder (not just loading a new page of the same folder)
+    if (!pageToken) {
+        grid.innerHTML = '<p style="text-align:center; grid-column: 1 / -1;">Loading...</p>';
+    }
+
     try {
-        // Build the URL to ask your Worker for data
         let url = WORKER_URL;
-        if (pageToken) {
-            url += `?pageToken=${pageToken}`; 
+        const params = new URLSearchParams();
+        if (pageToken) params.append('pageToken', pageToken);
+        if (folderId) params.append('folderId', folderId);
+        
+        if (params.toString()) {
+            url += `?${params.toString()}`;
         }
 
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
         
-        // 3. Render the fetched videos to the grid
-        if (data.items && data.items.length > 0) {
-            renderVideos(data.items, data.domainEmbed);
+        // Remove the loading text
+        if (!pageToken) grid.innerHTML = ''; 
+
+        // If at root and need a back button to reset
+        if (folderId !== "") {
+            renderBackButton();
         }
 
-        // 4. Handle Pagination
-        // If there are more videos, fetch the next page.
-        // We use a 1-second timeout (1000ms) to ensure we don't trip the 1200 request/5min rate limit.
+        if (data.items && data.items.length > 0) {
+            renderItems(data.items, data.domainEmbed);
+        } else if (!pageToken && (!data.items || data.items.length === 0)) {
+            grid.innerHTML = '<p style="text-align:center; grid-column: 1 / -1;">This folder is empty.</p>';
+        }
+
         if (data.pageToken) {
-            setTimeout(() => fetchVideos(data.pageToken), 1000); 
+            setTimeout(() => fetchResources(folderId, data.pageToken), 1000); 
         }
     } catch (error) {
-        console.error("Error fetching videos from proxy:", error);
+        console.error("Error fetching resources:", error);
+        grid.innerHTML = '<p style="text-align:center; color: red;">Failed to load resources.</p>';
     }
 }
 
-// 5. Render Video Cards to the DOM
-function renderVideos(items, domainEmbed) {
+function renderBackButton() {
+    const grid = document.getElementById('video-grid');
+    const backBtn = document.createElement('div');
+    backBtn.className = 'video-card folder-card';
+    backBtn.innerHTML = `
+        <div style="padding: 40px; text-align: center; background: #2a2a2a; font-size: 40px;">🔙</div>
+        <div class="video-info">
+            <h3 class="video-title">Go Back</h3>
+            <div class="video-meta">Return to Root</div>
+        </div>
+    `;
+    // Fetch the root directory again
+    backBtn.onclick = () => fetchResources(""); 
+    grid.appendChild(backBtn);
+}
+
+function renderItems(items, domainEmbed) {
     const grid = document.getElementById('video-grid');
     
-    items.forEach(video => {
-        // Skip folders, we only want to display playable files
-        if (video.isDir) return; 
-
+    items.forEach(item => {
         const card = document.createElement('div');
         card.className = 'video-card';
         
-        // Construct the embed iframe and metadata
-        card.innerHTML = `
-            <div class="iframe-container">
-                <iframe src="https://${domainEmbed}/?v=${video.id}" allowfullscreen frameborder="0" scrolling="no"></iframe>
-            </div>
-            <div class="video-info">
-                <h3 class="video-title">${video.name}</h3>
-                <div class="video-meta">Resolutions: ${video.resolutions ? video.resolutions.join(', ') : 'Processing...'}</div>
-            </div>
-        `;
+        if (item.isDir) {
+            // RENDER A FOLDER
+            card.classList.add('folder-card');
+            card.innerHTML = `
+                <div style="padding: 40px; text-align: center; background: #333; font-size: 50px;">📁</div>
+                <div class="video-info">
+                    <h3 class="video-title">${item.name}</h3>
+                    <div class="video-meta">Folder</div>
+                </div>
+            `;
+            // When clicked, fetch the contents of this specific folder
+            card.onclick = () => fetchResources(item.id); 
+        } else {
+            // RENDER A VIDEO FILE
+            card.innerHTML = `
+                <div class="iframe-container">
+                    <iframe src="https://${domainEmbed}/?v=${item.id}" allowfullscreen frameborder="0" scrolling="no"></iframe>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${item.name}</h3>
+                    <div class="video-meta">Resolutions: ${item.resolutions ? item.resolutions.join(', ') : 'Processing...'}</div>
+                </div>
+            `;
+        }
         grid.appendChild(card);
     });
 }
 
-// 6. Initialize the app on load
-fetchVideos();
+// Start by fetching the root directory
+fetchResources();
