@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Abyss Stream</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root { --bg: #121212; --text: #ffffff; --card: #1e1e1e; --accent: #bb86fc; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        header { text-align: center; margin-bottom: 30px; }
+        #video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .video-card { background-color: var(--card); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; cursor: pointer; }
+        .video-card:hover { transform: scale(1.02); }
+        .video-info { padding: 15px; }
+        .video-title { font-size: 1.1em; margin: 0 0 10px 0; font-weight: bold; }
+        .video-meta { font-size: 0.9em; color: #aaa; }
+        .iframe-container { position: relative; width: 100%; padding-bottom: 56.25%; }
+        .iframe-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>My Streaming Platform</h1>
+        <p>Real-time fetch from Abyss.to</p>
+    </header>
+    <main id="video-grid">
+        </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
