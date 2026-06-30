@@ -1,5 +1,5 @@
 // Point this to your new Cloudflare Worker URL
-const WORKER_URL = 'https://abyss-proxy.storage2-7777.workers.dev';
+const WORKER_URL = 'https://abyss-proxy.storage2-7777.workers.dev/';
 
 // --- ON-SCREEN VISUAL DEBUGGER ---
 const debugDiv = document.createElement('div');
